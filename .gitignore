@@ -1,0 +1,7 @@
+*.log
+datas/
+# Windows 保留设备名，Git Bash 中可能因重定向意外创建
+nul
+con
+prn
+aux

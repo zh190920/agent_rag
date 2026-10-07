@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fusion-rag-agent"
+version = "0.1.0"
+description = "融合五大主流Agent框架优势的企业级插件化多智能体RAG知识问答框架"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+authors = [{ name = "fusion-rag-agent" }]
+
+# 核心路径零强依赖（纯标准库可离线跑通），以下为可选增强
+dependencies = []
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2.6"]
+http = ["aiohttp>=3.9"]
+yaml = ["PyYAML>=6.0"]
+embedding = ["numpy>=1.21"]
+local-model = ["sentence-transformers>=2.6"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+fusion-rag = "fusion_rag.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fusion_rag*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

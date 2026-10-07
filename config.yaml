@@ -1,0 +1,190 @@
+# fusion-rag-agent 生产配置
+# 环境变量覆盖格式: FUSION_RAG__<SECTION>__<KEY>
+#
+# ★★★ 使用真实 LLM 步骤：★★★
+#   1. 导出环境变量，如: export DEEPSEEK_API_KEY="sk-xxx"
+#   2. 把下面 llm.router.default 从 "echo" 改为 "deepseek" 或 "ollama"
+#   3. 运行: bash scripts/run_kb.sh "你的问题"
+#   配好后答案会从 extractive(原文摘录) 变成 LLM 生成的自然语言综述。
+
+app:
+  name: fusion-rag-agent
+  data_dir: ~/.fusion_rag          # 本地化全留存根目录（OpenClaw 隐私特性）
+  log_level: INFO
+  log_json: true
+
+kernel:
+  max_concurrent_requests: 64      # 全局并发闸门
+  request_timeout: 120             # 单请求超时（秒）
+  cpu_workers: 8                   # CPU密集线程池（嵌入/BM25/余弦）
+  shutdown_grace: 10
+  quota_scope: tenant              # ★ 下游 LLM/embedding 并发子配额作域：
+                                   #   tenant=按租户公平 / session=按请求 / none=关闭。
+
+llm:
+  router:
+    default: openai               # ★ 实时 LLM：echo 仅降级兵底
+    retries: 0                    # ★ 40s 预算下不做 chat 重试（单轮失败直接写降级）；
+                                  #   旧=2 会白白重跑 2 个 15s 的 chat 将预算烧尽。
+    fallback_chain: [openai, echo]  # ★ 删掉同 endpoint 同 key 的 deepseek（假降级）；
+                                  #   真多供应商时再补回来。
+  tenant_max_concurrency: 6      # ★ 单租户/请求最多占用的模型并发槽（子配额）；需 <
+                                 #   provider 的 max_concurrency(16) 才生效。避免多用户并发
+                                 #   下某租户 fanout 吞满 16 窗口把别的租户饿死（TTFT 爆表）；
+                                 #   6 仍允许单请求 fanout(≤5) 全并发。0/删此键=关闭（旧行为）。
+  providers:
+    echo:
+      type: echo
+    openai:
+      type: openai_compatible
+      base_url: https://api.siliconflow.cn/v1
+      api_key: sk-bbcvyhngrdlhfiucokmkqhhfynnprbvdicloqjfvgrtdmqjr
+      model: Qwen/Qwen3-30B-A3B-Instruct-2507
+      # model: deepseek-ai/DeepSeek-V4-Flash
+      # model: Qwen/Qwen3-8B
+      timeout: 32                 # ★ 60→ 32：内嵌于 40s 总预算；SiliconFlow Qwen3-8B
+                                  #   实际首字延迟 15–25s，太短会直接降级到 echo。
+      max_concurrency: 16
+    deepseek:
+      type: openai_compatible
+      base_url: https://api.siliconflow.cn/v1
+      api_key: sk-bbcvyhngrdlhfiucokmkqhhfynnprbvdicloqjfvgrtdmqjr
+      model: Qwen/Qwen3-8B
+      timeout: 32
+      max_concurrency: 16
+    ollama:
+      type: openai_compatible
+      base_url: http://localhost:11434/v1
+      api_key_env: ""
+      model: qwen2.5:14b-instruct
+      timeout: 120
+      max_concurrency: 8
+
+embedding:
+  provider: hash                   # hash(离线兜底) / openai / sentence_transformers
+  dimensions: 256                   # 与已索引数据一致；若改此值需重新 --reindex
+  tenant_max_concurrency: 4        # ★ 嵌入子配额（同 llm，对 embedding 全局 max_concurrency=8）。
+  openai:
+    base_url: https://api.siliconflow.cn/v1
+    api_key: sk-bbcvyhngrdlhfiucokmkqhhfynnprbvdicloqjfvgrtdmqjr
+    model: BAAI/bge-m3
+  sentence_transformers:
+    model: BAAI/bge-small-zh-v1.5
+
+retrieval:
+  mode: agentic                    # pipeline=预检索+回炉(旧) | agentic=模型驱动全流程
+  agentic_retry: 0                 # ★ 默认不再回炉重试（成本翻倍），验证失败时依靠 self-confidence 向下标注
+  agentic_budget_ms: 150000        # ★ 150s agentic 循环上界（SiliconFlow 单轮 ~22–28s，允许 6 轮迭代）。
+  agentic_plan_first: true       # ★ 启用“问题分解”式规划：模型在循环内用 plan_update 把
+  #   复合问题拆成“要回答它需要厘清哪些子问题”（先分辨未核实所指的【前提】与依赖
+  #   它的【诉求】）。每轮作为参考回显、驱动自主检索；可随理解增删改。这是导航不是
+  #   任务表——不设完成门、不要求逐条勾完，证据够了随时作答。
+  top_k: 6
+  vector_recall: 20
+  bm25_recall: 20
+  rrf_k: 60
+  score_threshold: 0.05            # ★ 现已作用到 cross-encoder 输出的 relevance_score
+  #   (0–1)。旧=0.01 当时作用在 RRF 分上 ≈不过滤；现调到 0.05：过滤完全
+  #   不相关候选但保留弱相关，可依实际命中率继续上调。
+  reranker: cross_encoder           # null / heuristic / llm / cross_encoder
+  reranker_config:                  # cross_encoder 专用参数（可缺省复用 embedding 的 base_url/api_key）
+    model: BAAI/bge-reranker-v2-m3
+    timeout: 15
+  agentic_tools: true              # 运行时自主调用文件工具（需真实 function-calling 模型）
+  agentic_seed_direct: true        # ★ 策略A：seed 已含 file:line 行级证据时首轮直接作答，
+                                  #   跳过多余工具往返（省一轮 ~20s chat，将端到端压向 40s）。
+                                  #   关闭则回到“无论如何先跑一轮工具”的旧行为。
+  agentic_seed_direct_min_conf: 0.7 # ★ 满足才停（①+③）：策略A 直答自报置信低于此值（或呈
+                                  #   “资料未提及”对冲）则不收敛，回退工具循环真检索直到达标或耗尽预算。
+  seed_llm_decompose: true         # ★ 子查询拆解完全走大模型（②b，已删确定性正则拆分器）：会
+                                  #   在预检索前额外花一次 chat（~+8~15s）可能顶爆 40s；默认开。
+  # ★ 多手册并发子 Agent 检索（fanout）：seed 预检索若命中≥2本手册，按手册分片
+  #   并发派发子 Agent 各自检索；任一 Worker 自报置信度达 confidence_threshold 就
+  #   广播停止信号让其余 Worker 提前收尾（先到先得，软停止不硬杀 Task，对标
+  #   hermes cancel_event / agentscope asyncio.gather 扇出范式）。无人达阈值时
+  #   走一次不带工具的合成调用合并各方证据摘要（对标 deepagents 子Agent只回传摘要）。
+  #   默认关闭，开启前非 fanout 路径行为完全不变（零回归）。
+  fanout:
+    enabled: true                  # ★ 开启多手册并发子 Agent（需 seed 命中≥本手册才触发）
+    max_manuals: 5                 # 并发子 Agent 数上限（按 seed 命中分组数截断）
+    confidence_threshold: 0.7      # 触发“已解决”广播的最低 self_confidence
+    worker_max_iters: 4            # 每个子 Agent 独立迭代上限（低于全局 max_iters=6，
+    #   因为并发本身已经降低了单个 Worker 的深度需求）
+    merge_enabled: true            # 无人达标时是否发起一次合成调用（关闭则退回最高分Worker原始答案）
+  chunk:
+    max_tokens: 400
+    overlap_tokens: 60
+
+# 运行时 agentic 文件工具（对标 Claude Code / hermes：模型自主 grep/glob/read）
+# 仅在 llm.router.default 指向支持 function-calling 的真实模型时生效；
+# 离线 EchoLLM 会自动跳过。所有工具被 jail 在下列授权目录内，越权即拒绝。
+tools:
+  enabled: true
+  max_iters: 6                     # ★ 模型自主最多 6 轮工具调用（实际受 budget_ms 约束，不一定跑完）
+  call_timeout: 10                 # 单个工具调用超时（秒），8→ 10；容忍 SiliconFlow 偶发拖低
+  allow: [grep, glob, find, list_dir, read_file, search_kb, plan_update]   # 文件工具在前、search_kb 在后：弱化弱模型“选第一个工具”锚定（下发给模型的 tools 数组顺序即此顺序）
+  roots:                           # 租户 -> 授权目录（jail 根）
+    default: datas/md              # PDF转出的MD文件实际所在目录
+  kb_roots:                        # 可选：知识库 -> 目录（更细粒度隔离）
+    general: datas/md
+
+# Skills：教模型「怎么做某类任务」的流程说明书（Anthropic Agent Skills 规范）
+# 每个技能是一个含 SKILL.md（YAML frontmatter: name/description/allowed-tools）的目录。
+# 采用渐进式披露：技能清单(name+description+路径)注入 ToolAgent 提示词，模型判断匹
+# 配后用 read_file 按需读全文；技能目录自动并入工具 jail 授权根。仅 agentic 路径生效。
+skills:
+  enabled: true
+  dirs:                            # 分层来源，顺序即优先级（后层同名覆盖前层）
+    - ../../skills                 # 相对 data_dir 解析 -> 项目根/skills/
+
+planning:
+  enabled: true
+  max_sub_questions: 5
+  decompose_threshold: 30          # 问题长度超过该值才触发LLM拆解
+  context_token_budget: 6000
+  short_term_rounds: 6
+
+validation:
+  enabled: true
+  max_retry: 2
+  min_confidence: 0.5
+
+security:
+  redaction_enabled: true
+  hitl_enabled: false              # 高风险问题人工介入开关
+  default_tenant: default
+  tenants:
+    default:
+      kbs: [general]
+      rate_limit_rps: 10
+      burst: 20
+    # 如需访问 PLC 专用知识库，加：
+    # plc_user:
+    #   kbs: [general, plc]
+
+storage:
+  sqlite:
+    path: ${data_dir}/state/fusion_rag.db
+    wal: true
+    busy_timeout_ms: 5000
+  vector_store:
+    type: local                    # local / chroma / milvus / qdrant（插件扩展）
+    path: ${data_dir}/vectors
+
+observability:
+  trace_path: ${data_dir}/traces/traces.jsonl
+  # 轨迹采样率：[0.0, 1.0]。1.0=全量落盘（demo 默认）；1000 QPS 以上的生
+  # 产建议 0.05–0.2，避免磁盘上 JSONL 无限制膨胀。
+  trace_sample_rate: 1.0
+  # 命中异常/降级的 trace 无视采样率、无条件保留（否则采样反而拉低
+  # 可观测度，故障现场看不到）。
+  trace_keep_error_traces: true
+  metrics_path: ${data_dir}/metrics/snapshot.json
+  alert:
+    error_rate_threshold: 0.2
+    p95_latency_threshold: 30
+    window_seconds: 60
+
+api:
+  host: 127.0.0.1
+  port: 8300
