@@ -684,10 +684,11 @@ def main() -> int:
     args = parser.parse_args()
 
     # q = "程序备份指令支持多少种备份方法，分别是什么"
-    q = "大点数机器设备报错短路故障，怎么恢复错误？"
+    # q = "大点数机器设备报错短路故障，怎么恢复错误？"
     # q = "h5u有哪些型号plc"
-    # q = "easy320是否支持fins"
+    q = "easy320是否支持fins"
     # q = "H5U可以带多少个扩展模块"
+    q = "Ethercat主站怎么配置"
 
     question = args.question or q
     if not args.question:

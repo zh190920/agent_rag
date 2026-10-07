@@ -15,6 +15,7 @@ import asyncio
 import json
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import LLMBase, Message
 from ..text import tokenize_query
@@ -112,6 +113,7 @@ class LLMReranker(RerankerBase):
             f"[{i}] {c.content[:300]}" for i, c in enumerate(candidates)
         )
         system = (
+            INOVANCE_PERSONA + "\n"
             "你是检索结果重排器。给定问题与编号候选片段，判断每个片段对回答问题的"
             "相关性，从高到低输出编号顺序。只输出 JSON。__RERANK__\n"
             '格式：{"order": [编号, ...]}'

@@ -30,6 +30,7 @@ import dataclasses
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import Message
 from .base import AgentContext
@@ -328,6 +329,7 @@ class FanoutCoordinator:
         hint_line = f"\n{output_hint}" if output_hint else ""
         messages = [
             Message.system(
+                INOVANCE_PERSONA + "\n"
                 "你是知识库问答的合成环节。下面是同一问题在几本不同手册里分别检索到的"
                 "证据摘要（可能不完整、也可能互相补充），请只依据这些证据综合给出最终"
                 "答案，不要编造摘要里没有的内容。答案末尾追加 "

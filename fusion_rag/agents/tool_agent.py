@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..core.logging import get_logger
-from ..constants import cite_extension_alternation as _cite_alt
+from ..constants import INOVANCE_PERSONA, cite_extension_alternation as _cite_alt
 from ..llm.base import Message
 from ..tools.base import ToolContext, ToolResult
 from ..tools.plan_tool import PlanStore
@@ -1054,7 +1054,8 @@ class ToolAgent(BaseAgent):
                 f" intent={intent_label or '未知'}。\n"
             )
         return (
-            "你是工控知识库智能助手，通过工具深度问答。\n"
+            INOVANCE_PERSONA + "\n"
+            "通过工具对知识库做深度问答。\n"
             f"{intent_block}"
             f"{skill_block}"
             f"授权目录：{roots}\n"

@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import LLMBase, Message
 from ..types import Priority
@@ -101,8 +102,10 @@ class TaskDecomposer:
     # ------------------------------------------------------------------
     async def _llm_decompose(self, question: str) -> list[str]:
         system = (
-            "你是问题拆解器。判断用户问题是否为需要分步检索的复合问题；"
-            "若是，拆解为若干语义完整、可独立检索的子问题（不超过 "
+            INOVANCE_PERSONA + "\n"
+            "你是问题拆解器。先识别问题中的汇川行业黑话/口语简称并归一为手册"
+            "标准名词（保留原词、追加标准写法）；再判断用户问题是否为需要分步检索的"
+            "复合问题；若是，拆解为若干语义完整、可独立检索的子问题（不超过 "
             f"{self.max_sub_questions} 个）；若否，返回空列表。只输出 JSON。__DECOMPOSE__\n"
             '格式：{"need_decompose": true/false, "sub_questions": ["...", "..."]}'
         )

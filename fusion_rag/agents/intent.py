@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import Message
 from ..types import IntentResult
@@ -56,6 +57,7 @@ class IntentAgent(BaseAgent):
     # ------------------------------------------------------------------
     async def _llm_classify(self, text: str) -> IntentResult | None:
         system = (
+            INOVANCE_PERSONA + "\n"
             "你是意图识别器。判断用户输入的类型与风险，只输出 JSON。__INTENT__\n"
             "字段：intent(qa/chitchat/reject/clarify), domain(知识域,如 general/tech/legal/medical/hr), "
             "risk(low/medium/high), valid(是否为有效知识问答), reason(简述)。\n"

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import Message
 from ..types import Answer, RetrievedChunk, ValidationResult
@@ -110,6 +111,7 @@ class ValidatorAgent(BaseAgent):
                 "若【答案】实质与【证据】一致即可 passed=true。"
             )
         system = (
+            INOVANCE_PERSONA + "\n"
             "你是严格的答案校验器。核对【答案】是否被【证据】充分支撑，从四个维度判断："
             "引用忠实性、完整性、逻辑一致性、是否存在幻觉。只输出 JSON。__VALIDATE__\n"
             '字段：passed(bool), confidence(0~1), issues(问题列表), '

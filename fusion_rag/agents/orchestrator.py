@@ -23,6 +23,7 @@ import re
 import time
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.events import Event, EventBus
 from ..core.exceptions import (
     AccessDeniedError,
@@ -343,13 +344,15 @@ class Orchestrator:
             return []
         try:
             resp = await self.llm_router.chat(  # type: ignore[union-attr]
-                [Message.user(
+                [Message.system(INOVANCE_PERSONA), Message.user(
                     "你是检索规划助手。请判断下面这个用户问题是否需要在手册/知"
                     "识库中分多路检索；若需要，拆成若干条各自可独立检索的子查询，"
                     "并覆盖以下关系类型（仅当问题确实涉及该类时才拆，不硬凑）：\n"
-                    "1. 实体/术语消歧：问题里含糊或相对的限定词（如“大点数/小点数”"
-                    "“常用型号”“新一代”这类没指明具体对象的词），补一条把它落到"
-                    "具体产品型号/系列的子查询（如“X 包含哪些产品型号/如何界定”）。\n"
+                    "1. 实体/术语消歧与黑话归一：先把问题里的汇川行业黑话/口语简称"
+                    "（如“H5U”“GL20”“AM600”，以及“大点数/小点数”“常用型号”“新一代”这"
+                    "类没指明具体对象的相对词）对应到手册标准名词；对含糊限定词补"
+                    "一条把它落到具体产品型号/系列的子查询（如“X 包含哪些产品型号/"
+                    "如何界定”），子查询里同时写出用户原词与标准名词。\n"
                     "2. 并列枚举：出现“A、B、C 分别…”“以及”“还有”时，为每个并列"
                     "对象各拆一条。\n"
                     "3. 对比/取舍：出现“区别/哪个更好/异同/对比”时，为每个被比较"

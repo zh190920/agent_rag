@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import LLMBase, Message
 from ..types import approx_token_count
@@ -145,6 +146,7 @@ class MemoryManager:
         if self._llm is None:
             return self._fallback_summary(old_summary, messages)
         system = (
+            INOVANCE_PERSONA + "\n"
             "你是对话摘要器。把【已有摘要】与【新增对话】合并压缩为简洁中文摘要，"
             "保留关键事实、结论、用户偏好与未决问题，不超过 300 字。直接输出摘要正文。"
         )

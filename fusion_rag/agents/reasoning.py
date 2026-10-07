@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..constants import INOVANCE_PERSONA
 from ..core.logging import get_logger
 from ..llm.base import Message
 from ..planning.context_offload import ContextOffloader, EvidenceBlock
@@ -123,6 +124,7 @@ class ReasoningAgent(BaseAgent):
         correction: str,
     ) -> Answer | None:
         system = (
+            INOVANCE_PERSONA + "\n"
             "你是企业知识库问答推理引擎。严格依据【证据】回答，禁止编造；"
             "证据不足时明确说明「知识库中未找到足够信息」，不要臆测。"
             "在引用证据的句子后用 [编号] 标注来源（编号对应证据前的方括号数字）。"

@@ -1,5 +1,26 @@
 *.log
 datas/
+
+# Python 运行产生的字节码缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 打包 / 分发产物
+*.egg-info/
+build/
+dist/
+
+# 测试与类型检查缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
 # Windows 保留设备名，Git Bash 中可能因重定向意外创建
 nul
 con
